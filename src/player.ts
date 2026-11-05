@@ -112,12 +112,16 @@ audio.addEventListener('timeupdate', () => {
 });
 
 // --- экран блокировки / Пункт управления ---
+let artUrl: string | null = null;
 function setSessionMetadata(t: Track) {
   if (!('mediaSession' in navigator)) return;
+  if (artUrl) URL.revokeObjectURL(artUrl);
+  artUrl = t.cover ? URL.createObjectURL(t.cover) : null;
   navigator.mediaSession.metadata = new MediaMetadata({
     title: t.title,
     artist: t.artist,
-    album: t.album
+    album: t.album,
+    artwork: artUrl ? [{ src: artUrl, sizes: '400x400', type: 'image/jpeg' }] : []
   });
 }
 
