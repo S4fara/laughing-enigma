@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, type CSSProperties } from 'react';
 import type { Track } from './db';
+import { usePlayer } from './player';
 import { Cover, Icon, P, Wave, fmt } from './ui';
 
 interface Props {
@@ -14,9 +15,13 @@ interface Props {
   onSeek: (t: number) => void;
 }
 
+const REPEAT_LABEL = { off: 'Повтор выключен', all: 'Повторять все треки', one: 'Повторять один трек' };
+
 export default function NowPlaying(p: Props) {
   const progress = p.duration > 0 ? p.current / p.duration : 0;
   const { onClose } = p;
+  const { shuffle, repeat, volume, volumeSupported, toggleShuffle, cycleRepeat, setVolume } = usePlayer();
+
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', h);
@@ -42,6 +47,14 @@ export default function NowPlaying(p: Props) {
         <span>{fmt(p.duration)}</span>
       </div>
       <div className="np-ctl">
+        <button
+          className={'side' + (shuffle ? ' on' : '')}
+          onClick={toggleShuffle}
+          aria-label={shuffle ? 'Перемешивание включено' : 'Перемешивание выключено'}
+          aria-pressed={shuffle}
+        >
+          <Icon d={P.shuffle} />
+        </button>
         <button onClick={p.onPrev} aria-label="Предыдущий трек">
           <Icon d={P.prev} size={32} />
         </button>
@@ -51,7 +64,30 @@ export default function NowPlaying(p: Props) {
         <button onClick={p.onNext} aria-label="Следующий трек">
           <Icon d={P.next} size={32} />
         </button>
+        <button
+          className={'side' + (repeat !== 'off' ? ' on' : '')}
+          onClick={cycleRepeat}
+          aria-label={REPEAT_LABEL[repeat]}
+        >
+          <Icon d={P.repeat} />
+          {repeat === 'one' && <span className="badge">1</span>}
+        </button>
       </div>
+      {volumeSupported && (
+        <div className="vol">
+          <Icon d={P.volume} size={20} />
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={volume}
+            onChange={(e) => setVolume(Number(e.target.value))}
+            style={{ '--p': `${volume * 100}%` } as CSSProperties}
+            aria-label="Громкость"
+          />
+        </div>
+      )}
     </div>
   );
 }

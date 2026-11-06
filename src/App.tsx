@@ -16,6 +16,7 @@ export default function App() {
   const [openId, setOpenId] = useState<number | null>(null);
   const [menu, setMenu] = useState<Menu>(null);
   const [full, setFull] = useState(false);
+  const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
   const { queue, index, playing, current, duration, playQueue, toggle, next, prev, seek } = usePlayer();
@@ -28,6 +29,12 @@ export default function App() {
   useEffect(() => {
     if (cur && !cur.peaks && !cur.peaksTried) void computePeaks(cur.id);
   }, [cur?.id, !!cur?.peaks, !!cur?.peaksTried]);
+
+  const needle = q.trim().toLowerCase();
+  const shown =
+    tracks && needle
+      ? tracks.filter((t) => `${t.title} ${t.artist} ${t.album}`.toLowerCase().includes(needle))
+      : tracks;
 
   const byId = new Map((tracks ?? []).map((t) => [t.id, t]));
   const openPl = playlists?.find((p) => p.id === openId);
@@ -107,10 +114,25 @@ export default function App() {
       <main className="list">
         {tab === 'tracks' && (
           <>
+            {tracks && tracks.length > 0 && (
+              <div className="search-wrap">
+                <input
+                  className="search"
+                  type="search"
+                  placeholder="Поиск по названию и исполнителю"
+                  aria-label="Поиск по библиотеке"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+            )}
             {tracks && tracks.length === 0 && (
               <p className="empty">Здесь пока пусто. Добавьте аудиофайлы с телефона или компьютера, и они появятся тут.</p>
             )}
-            {tracks?.map((t, i) => renderTrack(t, i, tracks))}
+            {tracks && tracks.length > 0 && shown && shown.length === 0 && (
+              <p className="empty">Ничего не найдено. Попробуйте другое слово.</p>
+            )}
+            {shown?.map((t, i) => renderTrack(t, i, shown))}
           </>
         )}
 
