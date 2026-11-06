@@ -1,0 +1,12 @@
+name = "player-bot"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+[vars]
+# Откуда разрешено обращаться к API (через запятую, без путей и слэша на конце)
+ALLOWED_ORIGIN = "https://s4fara.github.io,http://localhost:5173"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "player-db"
+database_id = "ПОДСТАВЬТЕ_ID_ИЗ_ШАГА_4"

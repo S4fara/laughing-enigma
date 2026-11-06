@@ -11,6 +11,7 @@ export interface Track {
   coverTried?: boolean;
   peaks?: number[];
   peaksTried?: boolean;
+  remoteId?: string; // id трека в облаке (Telegram-бот)
 }
 
 export interface TrackFile {
@@ -23,6 +24,7 @@ export interface Playlist {
   name: string;
   trackIds: number[];
   createdAt: number;
+  remoteId?: number; // id плейлиста в облаке
 }
 
 class PlayerDB extends Dexie {

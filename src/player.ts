@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db, type Track } from './db';
+import { ensureFile } from './cloud';
 
 const audio = new Audio();
 audio.preload = 'auto';
@@ -73,6 +74,8 @@ interface PlayerState {
   repeat: Repeat;
   volume: number;
   volumeSupported: boolean;
+  loading: boolean;
+  error: string | null;
   playQueue: (tracks: Track[], start: number) => void;
   toggle: () => void;
   next: () => void;
@@ -89,11 +92,24 @@ export const usePlayer = create<PlayerState>((set, get) => {
     const track = get().queue[i];
     if (!track) return;
     const mine = ++loadToken;
-    set({ index: i, current: 0, duration: track.duration });
-    const file = await db.files.get(track.id);
-    if (mine !== loadToken || !file) return;
+    set({ index: i, current: 0, duration: track.duration, loading: false, error: null });
+    let blob: Blob | undefined;
+    try {
+      const local = await db.files.get(track.id);
+      if (local) blob = local.blob;
+      else if (track.remoteId) {
+        set({ loading: true });
+        blob = await ensureFile(track);
+      }
+    } catch (e) {
+      if (mine === loadToken) set({ loading: false, error: e instanceof Error ? e.message : 'Не удалось загрузить трек' });
+      return;
+    }
+    if (mine !== loadToken) return;
+    set({ loading: false });
+    if (!blob) return;
     if (objectUrl) URL.revokeObjectURL(objectUrl);
-    objectUrl = URL.createObjectURL(file.blob);
+    objectUrl = URL.createObjectURL(blob);
     audio.src = objectUrl;
     setSessionMetadata(track);
     try {
@@ -125,6 +141,8 @@ export const usePlayer = create<PlayerState>((set, get) => {
     repeat: prefs.repeat,
     volume: startVolume,
     volumeSupported,
+    loading: false,
+    error: null,
 
     playQueue: (tracks, start) => {
       if (!unlocked) {

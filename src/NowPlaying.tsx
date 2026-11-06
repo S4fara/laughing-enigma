@@ -20,7 +20,7 @@ const REPEAT_LABEL = { off: 'Повтор выключен', all: 'Повтор�
 export default function NowPlaying(p: Props) {
   const progress = p.duration > 0 ? p.current / p.duration : 0;
   const { onClose } = p;
-  const { shuffle, repeat, volume, volumeSupported, toggleShuffle, cycleRepeat, setVolume } = usePlayer();
+  const { shuffle, repeat, volume, volumeSupported, loading, error, toggleShuffle, cycleRepeat, setVolume } = usePlayer();
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -39,7 +39,7 @@ export default function NowPlaying(p: Props) {
       <Cover track={p.track} label={p.track.title} className="np-cover" />
       <div className="np-meta">
         <h2>{p.track.title}</h2>
-        <p>{p.track.artist}</p>
+        <p className={error ? 'err' : ''}>{loading ? 'Загружаем трек…' : (error ?? p.track.artist)}</p>
       </div>
       <Wave peaks={p.track.peaks} id={p.track.id} progress={progress} onSeek={(r) => p.onSeek(r * p.duration)} />
       <div className="times">

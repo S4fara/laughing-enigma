@@ -18,22 +18,27 @@ export async function makeThumb(data: Uint8Array, type: string): Promise<Blob | 
   }
 }
 
+/** Достаёт обложку из скачанного файла трека. */
+export async function coverFor(id: number) {
+  let cover: Blob | undefined;
+  try {
+    const f = await db.files.get(id);
+    const pic = f ? (await parseBlob(f.blob)).common.picture?.[0] : undefined;
+    if (pic) cover = await makeThumb(pic.data, pic.format);
+  } catch {
+    // нет тегов — остаётся заглушка
+  }
+  await db.tracks.update(id, { cover, coverTried: true });
+}
+
 let backfilled = false;
-/** Один раз достаёт обложки для треков, добавленных до этого обновления. */
+/** Один раз достаёт обложки для треков, у которых уже есть файл на устройстве. */
 export async function backfillCovers() {
   if (backfilled) return;
   backfilled = true;
   const todo = await db.tracks.filter((t) => !t.coverTried).toArray();
   for (const t of todo) {
-    let cover: Blob | undefined;
-    try {
-      const f = await db.files.get(t.id);
-      const pic = f ? (await parseBlob(f.blob)).common.picture?.[0] : undefined;
-      if (pic) cover = await makeThumb(pic.data, pic.format);
-    } catch {
-      // нет тегов — остаётся заглушка
-    }
-    await db.tracks.update(t.id, { cover, coverTried: true });
+    if (await db.files.get(t.id)) await coverFor(t.id);
   }
 }
 
@@ -44,7 +49,8 @@ export async function computePeaks(id: number, bars = 96) {
   busy.add(id);
   try {
     const f = await db.files.get(id);
-    if (!f || f.blob.size > 30 * 1024 * 1024) throw new Error('skip');
+    if (!f) return; // файла ещё нет (трек из облака не скачан)
+    if (f.blob.size > 30 * 1024 * 1024) throw new Error('skip');
     type Ctor = typeof OfflineAudioContext;
     const C: Ctor =
       window.OfflineAudioContext ||
