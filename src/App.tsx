@@ -8,7 +8,8 @@ import * as cloud from './cloud';
 import NowPlaying from './NowPlaying';
 import CloudTab from './CloudTab';
 import Home from './Home';
-import { Cover, Icon, P, fmt } from './ui';
+import PlayerBar from './PlayerBar';
+import { Cover, Icon, P, fmt, useMedia } from './ui';
 
 type Menu = { track: Track; playlistId?: number } | null;
 type Tab = 'home' | 'search' | 'library' | 'cloud';
@@ -28,9 +29,22 @@ export default function App() {
   const [status, setStatus] = useState('');
   const [connected, setConnected] = useState(!!cloud.getCloud());
   const fileInput = useRef<HTMLInputElement>(null);
+  const desktop = useMedia('(min-width: 1000px)');
   const { queue, index, playing, current, duration, loading, error, playQueue, toggle, next, prev, seek } = usePlayer();
   const now = queue[index];
   const cur = useLiveQuery(() => (now ? db.tracks.get(now.id) : undefined), [now?.id]) ?? now;
+
+  // пробел = пауза/играть (на компьютере)
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && e.target === document.body) {
+        e.preventDefault();
+        usePlayer.getState().toggle();
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
 
   useEffect(() => {
     void backfillCovers();
@@ -218,21 +232,247 @@ export default function App() {
 
   const pct = duration > 0 ? (current / duration) * 100 : 0;
   const needDownload = plTracks.some((t) => t.remoteId && !cached.has(t.id));
-  const showHeader = tab === 'library' || tab === 'cloud';
   const title = tab === 'cloud' ? 'Облако' : openPl ? openPl.name : 'Библиотека';
 
-  return (
-    <div className={'app' + (tab === 'home' ? ' home-bg' : '')}>
-      {showHeader && (
-        <header>
-          <h1>{title}</h1>
-          {tab === 'library' && libTab === 'tracks' && !openPl && (
+  async function newPlaylist() {
+    const name = window.prompt('Название плейлиста')?.trim();
+    if (!name) return;
+    await guarded(async () => {
+      if (connected) {
+        await cloud.createPlaylist(name);
+        await cloud.syncLibrary();
+      } else {
+        await db.playlists.add({ name, trackIds: [], createdAt: Date.now() });
+      }
+    });
+  }
+  function go(t: Tab) {
+    setQ('');
+    if (t === 'library') {
+      setOpenId(null);
+      setLibTab('tracks');
+    }
+    setTab(t);
+  }
+
+  const pageHead = (tab === 'library' || tab === 'cloud') && (
+    <header>
+      <h1>{title}</h1>
+      {!desktop && tab === 'library' && libTab === 'tracks' && !openPl && (
+        <button className="add" onClick={() => fileInput.current?.click()}>
+          Добавить музыку
+        </button>
+      )}
+    </header>
+  );
+
+  const libChips = tab === 'library' && !openPl && (
+    <div className="chips">
+      <button className={'chip' + (libTab === 'tracks' ? ' on' : '')} onClick={() => setLibTab('tracks')}>
+        Треки
+      </button>
+      <button className={'chip' + (libTab === 'playlists' ? ' on' : '')} onClick={() => setLibTab('playlists')}>
+        Плейлисты
+      </button>
+    </div>
+  );
+
+  const statusBar = status ? <div className="status">{status}</div> : null;
+
+  const body = (
+    <main className={'list' + (tab === 'home' ? ' flush' : '')}>
+      {tab === 'home' && (
+        <Home
+          tracks={tracks ?? []}
+          playlists={playlists ?? []}
+          byId={byId}
+          cached={cached}
+          nowId={now?.id}
+          desktop={desktop}
+          onPlay={playQueue}
+          onOpenPlaylist={openPlaylist}
+          onSeeAll={openLibrary}
+          onAdd={() => fileInput.current?.click()}
+          onCloud={() => setTab('cloud')}
+        />
+      )}
+
+      {tab === 'search' && (
+        <>
+          {!needle && <p className="empty">Ищите по названию, исполнителю, альбому или названию плейлиста.</p>}
+          {needle && found.length === 0 && foundPl.length === 0 && <p className="empty">Ничего не найдено. Попробуйте другое слово.</p>}
+          {foundPl.map(renderPlaylistRow)}
+          {found.map((t, i) => renderTrack(t, i, found))}
+        </>
+      )}
+
+      {tab === 'library' && libTab === 'tracks' && !openPl && (
+        <>
+          {tracks && tracks.length === 0 && (
+            <p className="empty">Здесь пока пусто. Добавьте аудиофайлы с устройства или подключите облако на вкладке «Облако».</p>
+          )}
+          {tracks?.map((t, i) => renderTrack(t, i, tracks))}
+        </>
+      )}
+
+      {tab === 'library' && libTab === 'playlists' && !openPl && (
+        <>
+          {playlists && playlists.length === 0 && <p className="empty">Плейлистов пока нет. Нажмите «⋯» у трека и выберите «В новый плейлист».</p>}
+          <div className="grid">
+            {playlists?.map((p) => (
+              <button key={p.id} className="card" onClick={() => setOpenId(p.id)}>
+                <Cover track={byId.get(p.trackIds[0])} label={p.name} className="card-cover" />
+                <span className="t-title">{p.name}</span>
+                <span className="t-sub">
+                  {p.remoteId != null ? 'Облако · ' : ''}Треков: {p.trackIds.length}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {tab === 'library' && openPl && (
+        <>
+          <div className="sub-bar">
+            <button onClick={() => setOpenId(null)}>Назад</button>
+            <button className="primary" disabled={!plTracks.length} onClick={() => playQueue(plTracks, 0)}>
+              Играть
+            </button>
+            {needDownload && <button onClick={() => download(plTracks)}>Скачать для оффлайна</button>}
+            <button className="danger" onClick={() => removePlaylist(openPl)}>
+              Удалить плейлист
+            </button>
+          </div>
+          {plTracks.length === 0 && <p className="empty">В плейлисте пока нет треков. Добавьте их из библиотеки.</p>}
+          {plTracks.map((t, i) => renderTrack(t, i, plTracks, openPl.id))}
+        </>
+      )}
+
+      {tab === 'cloud' && <CloudTab onChanged={() => setConnected(!!cloud.getCloud())} />}
+    </main>
+  );
+
+  const overlays = (
+    <>
+      <input ref={fileInput} type="file" accept="audio/*" multiple hidden onChange={onPick} />
+
+      {full && cur && (
+        <NowPlaying
+          track={cur}
+          playing={playing}
+          current={current}
+          duration={duration}
+          onClose={() => setFull(false)}
+          onToggle={toggle}
+          onPrev={prev}
+          onNext={next}
+          onSeek={seek}
+        />
+      )}
+
+      {menu && (
+        <div className="scrim" onClick={() => setMenu(null)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-title">{menu.track.title}</div>
+            {menu.playlistId != null && <button onClick={() => removeFrom(menu.playlistId!, menu.track)}>Убрать из этого плейлиста</button>}
+            {compatible(menu.track).map((p) => (
+              <button key={p.id} onClick={() => addTo(p, menu.track)}>
+                В плейлист «{p.name}»
+              </button>
+            ))}
+            <button onClick={() => addToNew(menu.track)}>В новый плейлист…</button>
+            {menu.track.remoteId && !cached.has(menu.track.id) && <button onClick={() => download([menu.track])}>Скачать для оффлайна</button>}
+            {menu.track.remoteId && cached.has(menu.track.id) && (
+              <button onClick={() => dropFromDevice(menu.track)}>Убрать с устройства (останется в облаке)</button>
+            )}
+            <button className="danger" onClick={() => removeTrack(menu.track)}>
+              {menu.track.remoteId ? 'Удалить из облака' : 'Удалить из библиотеки'}
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  // ---------- версия для компьютера ----------
+  if (desktop) {
+    return (
+      <div className="d-app">
+        <aside className="d-side">
+          <div className="d-brand">
+            <span className="logo">
+              <Icon d={P.play} size={20} />
+            </span>
+            <span>Плеер</span>
+          </div>
+          <nav className="d-nav">
+            <button className={tab === 'home' ? 'on' : ''} onClick={() => go('home')}>
+              <Icon d={P.home} />
+              Главная
+            </button>
+            <button className={tab === 'library' ? 'on' : ''} onClick={() => go('library')}>
+              <Icon d={P.library} />
+              Библиотека
+            </button>
+            <button className={tab === 'cloud' ? 'on' : ''} onClick={() => go('cloud')}>
+              <Icon d={P.cloud} />
+              Облако
+            </button>
+          </nav>
+          <hr />
+          <button className="d-new" onClick={newPlaylist}>
+            <Icon d={P.plus} size={20} />
+            Новый плейлист
+          </button>
+          <div className="d-pls">
+            {playlists?.map((p) => (
+              <button key={p.id} className={'d-pl' + (tab === 'library' && openId === p.id ? ' on' : '')} onClick={() => openPlaylist(p.id)}>
+                <span className="t-title">{p.name}</span>
+                <span className="t-sub">
+                  {p.remoteId != null ? 'Облако · ' : ''}Треков: {p.trackIds.length}
+                </span>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <div className={'d-main' + (tab === 'home' ? ' home-bg' : '')}>
+          <div className="d-top">
+            <label className="d-search">
+              <Icon d={P.search} size={22} />
+              <input
+                type="search"
+                placeholder="Поиск по названию и исполнителю"
+                aria-label="Поиск по библиотеке"
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  if (e.target.value.trim()) setTab('search');
+                  else if (tab === 'search') setTab('home');
+                }}
+              />
+            </label>
             <button className="add" onClick={() => fileInput.current?.click()}>
               Добавить музыку
             </button>
-          )}
-        </header>
-      )}
+          </div>
+          {pageHead}
+          {libChips}
+          {statusBar}
+          {body}
+        </div>
+
+        {cur && <PlayerBar track={cur} onOpen={() => setFull(true)} />}
+        {overlays}
+      </div>
+    );
+  }
+
+  // ---------- версия для телефона ----------
+  return (
+    <div className={'app' + (tab === 'home' ? ' home-bg' : '')}>
+      {pageHead}
 
       {tab === 'search' && (
         <div className="search-top">
@@ -247,91 +487,9 @@ export default function App() {
         </div>
       )}
 
-      {tab === 'library' && !openPl && (
-        <div className="chips">
-          <button className={'chip' + (libTab === 'tracks' ? ' on' : '')} onClick={() => setLibTab('tracks')}>
-            Треки
-          </button>
-          <button className={'chip' + (libTab === 'playlists' ? ' on' : '')} onClick={() => setLibTab('playlists')}>
-            Плейлисты
-          </button>
-        </div>
-      )}
-
-      {status && <div className="status">{status}</div>}
-
-      <main className={'list' + (tab === 'home' ? ' flush' : '')}>
-        {tab === 'home' && (
-          <Home
-            tracks={tracks ?? []}
-            playlists={playlists ?? []}
-            byId={byId}
-            cached={cached}
-            nowId={now?.id}
-            onPlay={playQueue}
-            onOpenPlaylist={openPlaylist}
-            onSeeAll={openLibrary}
-            onAdd={() => fileInput.current?.click()}
-            onCloud={() => setTab('cloud')}
-          />
-        )}
-
-        {tab === 'search' && (
-          <>
-            {!needle && <p className="empty">Ищите по названию, исполнителю, альбому или названию плейлиста.</p>}
-            {needle && found.length === 0 && foundPl.length === 0 && <p className="empty">Ничего не найдено. Попробуйте другое слово.</p>}
-            {foundPl.map(renderPlaylistRow)}
-            {found.map((t, i) => renderTrack(t, i, found))}
-          </>
-        )}
-
-        {tab === 'library' && libTab === 'tracks' && !openPl && (
-          <>
-            {tracks && tracks.length === 0 && (
-              <p className="empty">Здесь пока пусто. Добавьте аудиофайлы с устройства или подключите облако на вкладке «Облако».</p>
-            )}
-            {tracks?.map((t, i) => renderTrack(t, i, tracks))}
-          </>
-        )}
-
-        {tab === 'library' && libTab === 'playlists' && !openPl && (
-          <>
-            {playlists && playlists.length === 0 && (
-              <p className="empty">Плейлистов пока нет. Нажмите «⋯» у трека и выберите «В новый плейлист».</p>
-            )}
-            <div className="grid">
-              {playlists?.map((p) => (
-                <button key={p.id} className="card" onClick={() => setOpenId(p.id)}>
-                  <Cover track={byId.get(p.trackIds[0])} label={p.name} className="card-cover" />
-                  <span className="t-title">{p.name}</span>
-                  <span className="t-sub">
-                    {p.remoteId != null ? 'Облако · ' : ''}Треков: {p.trackIds.length}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {tab === 'library' && openPl && (
-          <>
-            <div className="sub-bar">
-              <button onClick={() => setOpenId(null)}>Назад</button>
-              <button className="primary" disabled={!plTracks.length} onClick={() => playQueue(plTracks, 0)}>
-                Играть
-              </button>
-              {needDownload && <button onClick={() => download(plTracks)}>Скачать для оффлайна</button>}
-              <button className="danger" onClick={() => removePlaylist(openPl)}>
-                Удалить плейлист
-              </button>
-            </div>
-            {plTracks.length === 0 && <p className="empty">В плейлисте пока нет треков. Добавьте их из библиотеки.</p>}
-            {plTracks.map((t, i) => renderTrack(t, i, plTracks, openPl.id))}
-          </>
-        )}
-
-        {tab === 'cloud' && <CloudTab onChanged={() => setConnected(!!cloud.getCloud())} />}
-      </main>
+      {libChips}
+      {statusBar}
+      {body}
 
       {cur && (
         <div className="mini">
@@ -374,47 +532,7 @@ export default function App() {
         </button>
       </nav>
 
-      <input ref={fileInput} type="file" accept="audio/*" multiple hidden onChange={onPick} />
-
-      {full && cur && (
-        <NowPlaying
-          track={cur}
-          playing={playing}
-          current={current}
-          duration={duration}
-          onClose={() => setFull(false)}
-          onToggle={toggle}
-          onPrev={prev}
-          onNext={next}
-          onSeek={seek}
-        />
-      )}
-
-      {menu && (
-        <div className="scrim" onClick={() => setMenu(null)}>
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-title">{menu.track.title}</div>
-            {menu.playlistId != null && (
-              <button onClick={() => removeFrom(menu.playlistId!, menu.track)}>Убрать из этого плейлиста</button>
-            )}
-            {compatible(menu.track).map((p) => (
-              <button key={p.id} onClick={() => addTo(p, menu.track)}>
-                В плейлист «{p.name}»
-              </button>
-            ))}
-            <button onClick={() => addToNew(menu.track)}>В новый плейлист…</button>
-            {menu.track.remoteId && !cached.has(menu.track.id) && (
-              <button onClick={() => download([menu.track])}>Скачать для оффлайна</button>
-            )}
-            {menu.track.remoteId && cached.has(menu.track.id) && (
-              <button onClick={() => dropFromDevice(menu.track)}>Убрать с устройства (останется в облаке)</button>
-            )}
-            <button className="danger" onClick={() => removeTrack(menu.track)}>
-              {menu.track.remoteId ? 'Удалить из облака' : 'Удалить из библиотеки'}
-            </button>
-          </div>
-        </div>
-      )}
+      {overlays}
     </div>
   );
 }

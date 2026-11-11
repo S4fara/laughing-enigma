@@ -18,6 +18,8 @@ export const P = {
   repeat: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z',
   volume: 'M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z',
   cloud: 'M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z',
+  chevronLeft: 'M15.41 16.59 10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z',
+  chevronUp: 'M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z',
   chevronRight: 'M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6z',
   plus: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
   home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
@@ -97,4 +99,17 @@ export function Wave({ peaks, id, progress, onSeek }: { peaks?: number[]; id: nu
       ))}
     </div>
   );
+}
+
+/** true, пока выполняется media query (например, ширина окна от 1000px). */
+export function useMedia(query: string) {
+  const [match, setMatch] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const h = () => setMatch(mq.matches);
+    mq.addEventListener('change', h);
+    h();
+    return () => mq.removeEventListener('change', h);
+  }, [query]);
+  return match;
 }
