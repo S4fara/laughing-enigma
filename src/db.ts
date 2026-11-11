@@ -12,6 +12,8 @@ export interface Track {
   peaks?: number[];
   peaksTried?: boolean;
   remoteId?: string; // id трека в облаке (Telegram-бот)
+  lastPlayedAt?: number;
+  plays?: number;
 }
 
 export interface TrackFile {

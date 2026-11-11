@@ -1,8 +1,8 @@
 :root {
-  --ink: #14111a;
-  --surface: #1e1a27;
-  --raise: #2a2436;
-  --line: #342d41;
+  --ink: #0e0c13;
+  --surface: #1a1622;
+  --raise: #262031;
+  --line: #2e2839;
   --bar: #4d4363;
   --text: #f3eefa;
   --muted: #a69cb6;
@@ -129,3 +129,48 @@ input[type='range']:focus-visible { outline: 2px solid var(--accent); outline-of
 .add:disabled { opacity: 0.5; }
 .cloud-mark { display: inline-flex; vertical-align: -3px; margin-right: 6px; color: var(--muted); }
 .np-meta p.err, .t-sub.err { color: #ff9b9b; }
+
+/* --- главная в стиле YouTube Music --- */
+.app.home-bg { background: linear-gradient(180deg, rgba(255, 106, 43, 0.2), transparent 360px), var(--ink); }
+.list.flush { padding: 0; }
+.search-top { padding: 20px 20px 8px; }
+
+.home { padding-bottom: 16px; }
+.home-top { display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+.logo { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--on-accent); }
+.round { display: grid; place-items: center; width: 44px; height: 44px; background: rgba(255, 255, 255, 0.1); border: 0; border-radius: 50%; }
+
+.chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 14px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; padding: 10px 18px; background: rgba(255, 255, 255, 0.1); border: 0; border-radius: 12px; font-size: 15px; }
+.chip.on { background: var(--text); color: var(--ink); font-weight: 600; }
+
+.hero { padding: 40px 20px; max-width: 40ch; }
+.hero h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: -0.02em; }
+.hero p { margin: 0 0 20px; color: var(--muted); line-height: 1.5; }
+.hero-btns { display: flex; flex-wrap: wrap; gap: 10px; }
+.ghost { padding: 10px 18px; background: none; border: 1px solid var(--line); border-radius: 999px; }
+
+.qp-head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 12px 20px; background: none; border: 0; text-align: left; }
+.qp-head span { display: flex; flex-direction: column; }
+.qp-head small { color: var(--muted); font-size: 14px; letter-spacing: 0.04em; }
+.qp-head strong { font-size: 28px; letter-spacing: -0.02em; }
+.qp-pages { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.qp-pages::-webkit-scrollbar { display: none; }
+.qp-page { flex: 0 0 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 6px 20px; scroll-snap-align: start; }
+.tile { position: relative; aspect-ratio: 1; padding: 0; overflow: hidden; background: var(--raise); border: 0; border-radius: 12px; }
+.tile .cover { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; font-size: 36px; }
+.tile-title { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 8px 8px; overflow: hidden; background: linear-gradient(transparent, rgba(0, 0, 0, 0.8)); color: #fff; font-size: 14px; font-weight: 700; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
+.tile.active { outline: 3px solid #fff; outline-offset: 2px; }
+.dots { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--bar); }
+.dots span.on { background: var(--text); }
+
+.sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 32px 20px 12px; }
+.sec-head h2 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
+.see-all { flex: none; padding: 8px 16px; background: none; border: 1px solid var(--line); border-radius: 999px; }
+.row-scroll { display: flex; gap: 14px; overflow-x: auto; padding: 0 20px; scrollbar-width: none; }
+.row-scroll::-webkit-scrollbar { display: none; }
+.mcard { display: flex; flex: none; flex-direction: column; gap: 3px; width: 140px; padding: 0; background: none; border: 0; text-align: left; }
+.mcard .cover { width: 140px; height: 140px; margin-bottom: 4px; border-radius: 10px; font-size: 40px; }

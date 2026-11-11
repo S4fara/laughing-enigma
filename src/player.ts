@@ -112,6 +112,10 @@ export const usePlayer = create<PlayerState>((set, get) => {
     objectUrl = URL.createObjectURL(blob);
     audio.src = objectUrl;
     setSessionMetadata(track);
+    void db.tracks.where('id').equals(track.id).modify((t) => {
+      t.lastPlayedAt = Date.now();
+      t.plays = (t.plays ?? 0) + 1;
+    });
     try {
       await audio.play();
     } catch (e) {
